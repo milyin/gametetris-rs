@@ -1,22 +1,22 @@
 use console::{style, StyledObject, Term};
 use once_cell::sync::Lazy;
 
-use crate::tetris::CellType;
+use crate::{tetris::CellType, Field};
 
 pub struct TetrisTerm {
-    field: Vec<Vec<CellType>>,
-    preview: Vec<Vec<CellType>>,
+    field: Field,
+    preview: Field,
     x: usize,
     y: usize,
 }
 
 impl TetrisTerm {
-    pub fn new(x: usize, y: usize) -> TetrisTerm {
+    pub fn new(cols: usize, rows: usize) -> TetrisTerm {
         TetrisTerm {
-            field: Vec::new(),
-            preview: Vec::new(),
-            x,
-            y,
+            field: Field::new(cols, rows),
+            preview: Field::new(4, 4),
+            x: cols,
+            y: rows,
         }
     }
 
@@ -25,18 +25,13 @@ impl TetrisTerm {
         draw_field_on_term(
             term,
             &self.preview,
-            self.x + self.field[0].len() * 2 + 2 + 2,
+            self.x + self.field.cols() * 2 + 2 + 2,
             self.y,
             true,
         );
     }
 
-    pub fn update(
-        &mut self,
-        term: &Term,
-        field: &Vec<Vec<CellType>>,
-        preview: &Vec<Vec<CellType>>,
-    ) {
+    pub fn update(&mut self, term: &Term, field: &Field, preview: &Field) {
         if field != &self.field || preview != &self.preview {
             self.field = field.clone();
             self.preview = preview.clone();
@@ -58,21 +53,18 @@ fn draw_horizontal_border(term: &Term, x: usize, y: usize, width: usize) {
     term.write_str(&format!("{}", *CORNER)).unwrap();
 }
 
-fn draw_field_on_term(
-    term: &Term,
-    field: &Vec<Vec<CellType>>,
-    x: usize,
-    y: usize,
-    with_top_border: bool,
-) {
+fn draw_field_on_term(term: &Term, field: &Field, x: usize, y: usize, with_top_border: bool) {
+    let mut y = y;
     if with_top_border {
-        draw_horizontal_border(term, x, y, field[0].len());
+        draw_horizontal_border(term, x, y, field.cols());
+        y += 1;
     }
 
-    for (i, row) in field.iter().enumerate() {
-        term.move_cursor_to(x, y + i).unwrap();
+    for row in 0..field.rows() {
+        term.move_cursor_to(x, y + row).unwrap();
         term.write_str(&format!("{}", *BORDER_VERTICAL)).unwrap();
-        for (j, cell) in row.iter().enumerate() {
+        for col in 0..field.cols() {
+            let cell = field.get_cell(col, row);
             let s = match cell {
                 CellType::Empty => "  ",
                 CellType::Blasted => "@@",
@@ -94,5 +86,5 @@ fn draw_field_on_term(
         }
         term.write_str(&format!("{}", *BORDER_VERTICAL)).unwrap();
     }
-    draw_horizontal_border(term, x, y + field.len(), field[0].len());
+    draw_horizontal_border(term, x, y + field.rows(), field.cols());
 }

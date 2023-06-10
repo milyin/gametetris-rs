@@ -307,7 +307,7 @@ impl Tetromino {
     }
 
     // Check if tetromino intersects with field borders or other tetrominos
-    pub fn intersects(&self, field: &Vec<Vec<CellType>>) -> bool {
+    pub fn intersects(&self, field: &Field) -> bool {
         // Check if tetromino intersects with field borders or other tetrominos
         // Check if tetromino position is positive, otherwise it intersects with field borders
         let x = if self.x >= 0 {
@@ -324,14 +324,14 @@ impl Tetromino {
         let width = self.tetromino_type.get_width(&self.rotation);
         let height = self.tetromino_type.get_height(&self.rotation);
         // Check if tetromino intersects with field borders
-        if x + width > field[0].len() || y + height > field.len() {
+        if x + width > field.cols() || y + height > field.rows() {
             return true;
         }
         // Check if tetromino intersects with other tetrominos
         for cell_y in 0..height {
             for cell_x in 0..width {
                 if self.tetromino_type.get_cell(cell_x, cell_y, &self.rotation)
-                    && field[y + cell_y][x + cell_x] != CellType::Empty
+                    && field.get_cell(x + cell_x, y + cell_y) != CellType::Empty
                 {
                     return true;
                 }
@@ -343,7 +343,7 @@ impl Tetromino {
 
     // Draw tetromino on field. If tetromino intersects with field borders, draw it partially.
     // I.e for any cell position check is it inside field borders and if it is, draw it.
-    pub fn draw(&self, field: &mut Vec<Vec<CellType>>) {
+    pub fn draw(&self, field: &mut Field) {
         // Draw tetromino on field
         // Get tetromino width and height
         let width = self.tetromino_type.get_width(&self.rotation);
@@ -357,8 +357,8 @@ impl Tetromino {
                     // Check resulting positoins are positive and less than field borders
                     let x = self.x + cell_x as isize;
                     let y = self.y + cell_y as isize;
-                    if x >= 0 && x < field[0].len() as isize && y >= 0 && y < field.len() as isize {
-                        field[y as usize][x as usize] = cell_type;
+                    if x >= 0 && x < field.cols() as isize && y >= 0 && y < field.rows() as isize {
+                        field.set_cell(x as usize, y as usize, cell_type);
                     }
                 }
             }
@@ -376,6 +376,63 @@ pub enum Action {
     RotateRight,
     Drop,
     BottomRefill,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
+pub struct Field {
+    // Field width
+    cols: usize,
+    // Field height
+    rows: usize,
+    // Field cells
+    cells: Vec<Vec<CellType>>,
+}
+
+impl Field {
+    pub fn new(cols: usize, rows: usize) -> Self {
+        // Create new field
+        Field {
+            cols,
+            rows,
+            cells: Vec::new(),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.cells.clear();
+    }
+
+    pub fn cols(&self) -> usize {
+        // Return field width
+        self.cols
+    }
+
+    pub fn rows(&self) -> usize {
+        // Return field height
+        self.rows
+    }
+
+    pub fn set_cell(&mut self, x: usize, y: usize, cell_type: CellType) {
+        if x >= self.cols || y >= self.rows {
+            return;
+        }
+        if self.cells.len() <= y {
+            self.cells.resize(y + 1, Vec::new());
+        }
+        if self.cells[y].len() <= x {
+            self.cells[y].resize(x + 1, CellType::Empty);
+        }
+        self.cells[y][x] = cell_type;
+    }
+
+    pub fn get_cell(&self, x: usize, y: usize) -> CellType {
+        // Get cell value
+        self.cells
+            .get(y)
+            .and_then(|row| row.get(x))
+            .cloned()
+            .unwrap_or(CellType::Empty)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize)]
@@ -397,9 +454,9 @@ pub struct Tetris {
     // Game over flag
     game_over: bool,
     // Game field
-    field: Vec<Vec<CellType>>,
+    field: Field,
     // Preview field
-    preview: Vec<Vec<CellType>>,
+    preview: Field,
     // Current tetromino
     current: Option<Tetromino>,
     // Next tetromino
@@ -430,14 +487,10 @@ impl Tetris {
     pub fn new(width: usize, height: usize) -> Self {
         // Create new tetris game
         // Create game field, functional style
-        let field = (0..height)
-            .map(|_| (0..width).map(|_| CellType::Empty).collect())
-            .collect();
+        let field = Field::new(width, height);
 
         // Create preview field, functional style
-        let mut preview = (0..4)
-            .map(|_| (0..4).map(|_| CellType::Empty).collect())
-            .collect();
+        let mut preview = Field::new(4, 4);
 
         // Set next tetromino type
         let next = Self::create_next_tetromino_type(&mut preview);
@@ -547,20 +600,25 @@ impl Tetris {
     }
 
     // Create next tetromino type and draw it on preview field
-    fn create_next_tetromino_type(preview: &mut Vec<Vec<CellType>>) -> TetrominoType {
+    fn create_next_tetromino_type(preview: &mut Field) -> TetrominoType {
         // Create next tetromino and draw it on preview field
         // Get next tetromino type
         let tetromino_type = TetrominoType::new_random();
         // Create new tetromino
         let tetromino = Tetromino::new(tetromino_type, Rotation::R0, 0, 0);
         // Draw tetromino on preview field
+        preview.clear();
         tetromino.draw(preview);
         // Get tetromino
         tetromino_type
     }
 
-    pub fn get_field(&self) -> &Vec<Vec<CellType>> {
+    pub fn get_field(&self) -> &Field {
         &self.field
+    }
+
+    pub fn get_preview(&self) -> &Field {
+        &self.preview
     }
 
     pub fn get_current(&self) -> &Option<Tetromino> {
@@ -658,7 +716,7 @@ impl Tetris {
         // Push all lines up
         for y in 1..self.rows {
             for x in 0..self.cols {
-                self.field[y - 1][x] = self.field[y][x];
+                self.field.set_cell(x, y - 1, self.field.get_cell(x, y));
             }
         }
         // Fill bottom line with random cells with probability of filled cell = 0.3
@@ -668,7 +726,7 @@ impl Tetris {
             } else {
                 CellType::Empty
             };
-            self.field[self.rows - 1][x] = cell_type;
+            self.field.set_cell(x, self.rows - 1, cell_type);
         }
         true
     }
@@ -691,7 +749,7 @@ impl Tetris {
         for y in 0..self.rows {
             let mut full_line = true;
             for x in 0..self.cols {
-                if self.field[y][x] == CellType::Empty {
+                if self.field.get_cell(x, y) == CellType::Empty {
                     full_line = false;
                     break;
                 }
@@ -699,7 +757,7 @@ impl Tetris {
             if full_line {
                 full_lines = true;
                 for x in 0..self.cols {
-                    self.field[y][x] = CellType::Blasted;
+                    self.field.set_cell(x, y, CellType::Blasted);
                 }
             }
         }
@@ -713,7 +771,7 @@ impl Tetris {
         // Find topmost blasted line
         let mut top_blasted_line = None;
         for y in 0..self.rows {
-            if self.field[y][0] == CellType::Blasted {
+            if self.field.get_cell(0, y) == CellType::Blasted {
                 top_blasted_line = Some(y);
                 break;
             }
@@ -725,12 +783,12 @@ impl Tetris {
         // Shift all lines above topmost blasted line down to one line
         for y in (0..top_blasted_line).rev() {
             for x in 0..self.cols {
-                self.field[y + 1][x] = self.field[y][x];
+                self.field.set_cell(x, y + 1, self.field.get_cell(x, y));
             }
         }
         // Fill topmost line with Empty cells
         for x in 0..self.cols {
-            self.field[0][x] = CellType::Empty;
+            self.field.set_cell(x, 0, CellType::Empty);
         }
         // Return true if there were blasted lines
         true
@@ -762,7 +820,7 @@ impl Tetris {
 pub struct TetrisGameState {
     pub cols: usize,
     pub rows: usize,
-    pub field: Vec<Vec<CellType>>,
-    pub preview: Vec<Vec<CellType>>,
+    pub field: Field,
+    pub preview: Field,
     pub game_over: bool,
 }
