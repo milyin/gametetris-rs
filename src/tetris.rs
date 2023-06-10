@@ -409,7 +409,7 @@ pub struct Tetris {
     // Drop state
     drop: bool,
     // Game speed
-    game_speed: FrequencyRegulator,
+    fall_speed: FrequencyRegulator,
     // Drop speed
     drop_speed: FrequencyRegulator,
     // Blasting speed
@@ -462,12 +462,24 @@ impl Tetris {
             next,
             actions,
             drop: false,
-            game_speed: FrequencyRegulator::new(1, 100),
+            fall_speed: FrequencyRegulator::new(1, 100),
             drop_speed: FrequencyRegulator::new(1, 10),
-            line_remove_speed: FrequencyRegulator::new(3, 10),
+            line_remove_speed: FrequencyRegulator::new(1, 3),
             line_remove_delay: None,
             _score,
         }
+    }
+
+    pub fn set_fall_speed(&mut self, lines: usize, steps: usize) {
+        self.fall_speed = FrequencyRegulator::new(lines, steps);
+    }
+
+    pub fn set_drop_speed(&mut self, lines: usize, steps: usize) {
+        self.drop_speed = FrequencyRegulator::new(lines, steps);
+    }
+
+    pub fn set_line_remove_speed(&mut self, lines: usize, steps: usize) {
+        self.line_remove_speed = FrequencyRegulator::new(lines, steps);
     }
 
     // Add user action to actions queue
@@ -507,7 +519,7 @@ impl Tetris {
                 self.actions.push_back(Action::MoveDown);
             }
         } else {
-            for _ in 0..self.game_speed.step() {
+            for _ in 0..self.fall_speed.step() {
                 self.actions.push_back(Action::MoveDown);
             }
         }
@@ -748,9 +760,9 @@ impl Tetris {
 
 #[derive(Serialize)]
 pub struct TetrisGameState {
-    cols: usize,
-    rows: usize,
-    field: Vec<Vec<CellType>>,
-    preview: Vec<Vec<CellType>>,
-    game_over: bool,
+    pub cols: usize,
+    pub rows: usize,
+    pub field: Vec<Vec<CellType>>,
+    pub preview: Vec<Vec<CellType>>,
+    pub game_over: bool,
 }

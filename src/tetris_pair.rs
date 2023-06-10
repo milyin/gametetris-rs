@@ -35,23 +35,44 @@ impl TetrisPair {
         }
     }
 
+    pub fn set_fall_speed(&mut self, lines: usize, steps: usize) {
+        self.tetris_a.set_fall_speed(lines, steps);
+        self.tetris_b.set_fall_speed(lines, steps);
+    }
+
+    pub fn set_drop_speed(&mut self, lines: usize, steps: usize) {
+        self.tetris_a.set_drop_speed(lines, steps);
+        self.tetris_b.set_drop_speed(lines, steps);
+    }
+
+    pub fn set_line_remove_speed(&mut self, lines: usize, steps: usize) {
+        self.tetris_a.set_line_remove_speed(lines, steps);
+        self.tetris_b.set_line_remove_speed(lines, steps);
+    }
+
+    pub fn step(&mut self) {
+        self.step_a = false;
+        self.step_b = false;
+        let step_result_a = self.tetris_a.step();
+        let step_result_b = self.tetris_b.step();
+        if step_result_a == StepResult::LineRemoved {
+            self.tetris_b.add_action(Action::BottomRefill);
+        }
+        if step_result_b == StepResult::LineRemoved {
+            self.tetris_a.add_action(Action::BottomRefill);
+        }
+    }
+
+    /// Use this method when players have different control loops
+    /// This guarantees that the game will run on frequiency of the slowest player
     pub fn step_player(&mut self, player: PlayerSide) -> usize {
         match player {
             PlayerSide::A => self.step_a = true,
             PlayerSide::B => self.step_b = true,
         }
         if self.step_a && self.step_b {
+            self.step();
             self.step_divergence = 0;
-            self.step_a = false;
-            self.step_b = false;
-            let step_result_a = self.tetris_a.step();
-            let step_result_b = self.tetris_b.step();
-            if step_result_a == StepResult::LineRemoved {
-                self.tetris_b.add_action(Action::BottomRefill);
-            }
-            if step_result_b == StepResult::LineRemoved {
-                self.tetris_a.add_action(Action::BottomRefill);
-            }
         } else {
             self.step_divergence += 1;
         }
