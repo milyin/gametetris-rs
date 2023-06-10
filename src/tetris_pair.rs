@@ -25,14 +25,22 @@ pub struct TetrisPair {
 }
 
 impl TetrisPair {
-    pub fn new(width: usize, height: usize) -> TetrisPair {
+    pub fn new(cols: usize, rows: usize) -> TetrisPair {
         TetrisPair {
-            tetris_a: Tetris::new(width, height),
-            tetris_b: Tetris::new(width, height),
+            tetris_a: Tetris::new(cols, rows),
+            tetris_b: Tetris::new(cols, rows),
             step_a: false,
             step_b: false,
             step_divergence: 0,
         }
+    }
+
+    pub fn rows(&self) -> usize {
+        self.tetris_a.rows()
+    }
+
+    pub fn cols(&self) -> usize {
+        self.tetris_a.cols()
     }
 
     pub fn set_fall_speed(&mut self, lines: usize, steps: usize) {

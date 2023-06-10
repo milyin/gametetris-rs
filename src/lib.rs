@@ -4,7 +4,8 @@ mod tetris;
 mod tetris_pair;
 
 pub use frequency_regulator::FrequencyRegulator;
-pub use term::TetrisTerm;
+pub use term::TetrisPairTermDraw;
+pub use term::TetrisTermDraw;
 pub use tetris::Action;
 pub use tetris::Field;
 pub use tetris::Tetris;

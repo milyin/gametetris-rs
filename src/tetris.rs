@@ -484,10 +484,10 @@ impl Default for Tetris {
 }
 
 impl Tetris {
-    pub fn new(width: usize, height: usize) -> Self {
+    pub fn new(cols: usize, rows: usize) -> Self {
         // Create new tetris game
         // Create game field, functional style
-        let field = Field::new(width, height);
+        let field = Field::new(cols, rows);
 
         // Create preview field, functional style
         let mut preview = Field::new(4, 4);
@@ -506,8 +506,8 @@ impl Tetris {
 
         // Create new tetris game
         Tetris {
-            cols: width,
-            rows: height,
+            cols,
+            rows,
             game_over,
             field,
             preview,
@@ -533,6 +533,14 @@ impl Tetris {
 
     pub fn set_line_remove_speed(&mut self, lines: usize, steps: usize) {
         self.line_remove_speed = FrequencyRegulator::new(lines, steps);
+    }
+
+    pub fn cols(&self) -> usize {
+        self.cols
+    }
+
+    pub fn rows(&self) -> usize {
+        self.rows
     }
 
     // Add user action to actions queue

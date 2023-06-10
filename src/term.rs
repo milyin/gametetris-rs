@@ -1,44 +1,100 @@
 use console::{style, StyledObject, Term};
 use once_cell::sync::Lazy;
 
-use crate::{tetris::CellType, Field};
+use crate::{
+    tetris::{CellType, TetrisGameState},
+    tetris_pair::TetrisPairState,
+    Field,
+};
 
-pub struct TetrisTerm {
+pub struct TetrisTermDraw {
     field: Field,
     preview: Field,
-    x: usize,
-    y: usize,
+    game_over: bool,
+    align_right: bool,
 }
 
-impl TetrisTerm {
-    pub fn new(cols: usize, rows: usize) -> TetrisTerm {
-        TetrisTerm {
+impl TetrisTermDraw {
+    pub fn new(cols: usize, rows: usize, align_right: bool) -> TetrisTermDraw {
+        TetrisTermDraw {
             field: Field::new(cols, rows),
             preview: Field::new(4, 4),
-            x: cols,
-            y: rows,
+            game_over: false,
+            align_right,
         }
     }
 
     pub fn refresh(&self, term: &Term) {
-        draw_field_on_term(term, &self.field, self.x, self.y, false);
-        draw_field_on_term(
-            term,
-            &self.preview,
-            self.x + self.field.cols() * 2 + 2 + 2,
-            self.y,
-            true,
-        );
+        let (_, width) = term.size();
+        let width = width as usize;
+        let x_field = if self.align_right {
+            width - self.field.cols() * 2 - 2
+        } else {
+            0
+        };
+        let x_preview = if self.align_right {
+            x_field - 4 * 2 - 2 - 2
+        } else {
+            self.field.cols() * 2 + 2 + 2
+        };
+
+        draw_field_on_term(term, &self.field, x_field, 0, false);
+        draw_field_on_term(term, &self.preview, x_preview, 0, true);
     }
 
-    pub fn update(&mut self, term: &Term, field: &Field, preview: &Field) {
-        if field != &self.field || preview != &self.preview {
-            self.field = field.clone();
-            self.preview = preview.clone();
+    pub fn update(&mut self, term: &Term, state: &TetrisGameState) {
+        if state.field != self.field
+            || state.preview != self.preview
+            || state.game_over != self.game_over
+        {
+            self.field = state.field.clone();
+            self.preview = state.preview.clone();
+            self.game_over = state.game_over;
             self.refresh(term);
         }
     }
 }
+
+pub struct TetrisPairTermDraw {
+    player: TetrisTermDraw,
+    opponent: TetrisTermDraw,
+    term_width: usize,
+}
+
+impl TetrisPairTermDraw {
+    pub fn new(cols: usize, rows: usize) -> TetrisPairTermDraw {
+        let term = Term::stdout();
+        let (_, width) = term.size();
+        let width = width as usize;
+        let player = TetrisTermDraw::new(cols, rows, false);
+        let opponent = TetrisTermDraw::new(cols, rows, true);
+        TetrisPairTermDraw {
+            player,
+            opponent,
+            term_width: width,
+        }
+    }
+
+    pub fn refresh(&self, term: &Term) {
+        self.player.refresh(term);
+        self.opponent.refresh(term);
+    }
+
+    pub fn update(&mut self, term: &Term, state: &TetrisPairState) {
+        let (_, width) = term.size();
+        let width = width as usize;
+        if width != self.term_width {
+            self.term_width = width;
+            term.clear_screen().unwrap();
+            self.refresh(term);
+        } else {
+            self.player.update(term, &state.player);
+            self.opponent.update(term, &state.opponent);
+        }
+    }
+}
+
+impl TetrisPairTermDraw {}
 
 static BORDER_VERTICAL: Lazy<StyledObject<&str>> = Lazy::new(|| style("|").dim().on_black());
 static BORDER_HORIZONTAL: Lazy<StyledObject<&str>> = Lazy::new(|| style("--").dim().on_black());

@@ -4,7 +4,7 @@ use std::{
 };
 
 use console::{Key, Term};
-use gametetris_rs::{Action, PlayerSide, TetrisPair, TetrisTerm};
+use gametetris_rs::{Action, PlayerSide, TetrisPair, TetrisPairTermDraw};
 
 // function which runs thread for reading key input and returns chamnel with key input
 fn read_key_input() -> Receiver<Key> {
@@ -19,18 +19,15 @@ fn read_key_input() -> Receiver<Key> {
 
 fn main() {
     let term = Term::stdout();
-    let Some((width,height)) = term.size_checked() else {
-        panic!("Cannot get term size");
-    };
 
     let key_rx = read_key_input();
     let mut tetris_pair = TetrisPair::default();
-    let mut tetris_term = TetrisTerm::new(0, 0);
+    let mut tetris_term = TetrisPairTermDraw::new(tetris_pair.cols(), tetris_pair.rows());
 
     // Setup ganme speed
     let step_delay = time::Duration::from_millis(10);
     tetris_pair.set_fall_speed(1, 30);
-    tetris_pair.set_drop_speed(1, 3);
+    tetris_pair.set_drop_speed(1, 1);
     tetris_pair.set_line_remove_speed(3, 5);
 
     term.clear_screen().unwrap();
@@ -59,7 +56,7 @@ fn main() {
 
         // Draw tetris field on term
         let state = tetris_pair.get_player_game_state(PlayerSide::A);
-        tetris_term.update(&term, &state.player.field, &state.player.preview);
+        tetris_term.update(&term, &state);
 
         let elapsed = start.elapsed();
         if elapsed < step_delay {
