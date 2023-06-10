@@ -1,38 +1,78 @@
-use console::{style, Term};
+use console::{style, StyledObject, Term};
+use once_cell::sync::Lazy;
 
 use crate::tetris::CellType;
 
-pub struct TetrisFieldTerm {
+pub struct TetrisTerm {
     field: Vec<Vec<CellType>>,
+    preview: Vec<Vec<CellType>>,
     x: usize,
     y: usize,
 }
 
-impl TetrisFieldTerm {
-    pub fn new(x: usize, y: usize) -> TetrisFieldTerm {
-        TetrisFieldTerm {
+impl TetrisTerm {
+    pub fn new(x: usize, y: usize) -> TetrisTerm {
+        TetrisTerm {
             field: Vec::new(),
+            preview: Vec::new(),
             x,
             y,
         }
     }
 
     pub fn refresh(&self, term: &Term) {
-        draw_field_on_term(term, &self.field, self.x, self.y);
+        draw_field_on_term(term, &self.field, self.x, self.y, false);
+        draw_field_on_term(
+            term,
+            &self.preview,
+            self.x + self.field[0].len() * 2 + 2 + 2,
+            self.y,
+            true,
+        );
     }
 
-    pub fn update(&mut self, term: &Term, field: &Vec<Vec<CellType>>) {
-        if field != &self.field {
+    pub fn update(
+        &mut self,
+        term: &Term,
+        field: &Vec<Vec<CellType>>,
+        preview: &Vec<Vec<CellType>>,
+    ) {
+        if field != &self.field || preview != &self.preview {
             self.field = field.clone();
+            self.preview = preview.clone();
             self.refresh(term);
         }
     }
 }
 
-fn draw_field_on_term(term: &Term, field: &Vec<Vec<CellType>>, x: usize, y: usize) {
+static BORDER_VERTICAL: Lazy<StyledObject<&str>> = Lazy::new(|| style("|").dim().on_black());
+static BORDER_HORIZONTAL: Lazy<StyledObject<&str>> = Lazy::new(|| style("--").dim().on_black());
+static CORNER: Lazy<StyledObject<&str>> = Lazy::new(|| style("+").dim().on_black());
+
+fn draw_horizontal_border(term: &Term, x: usize, y: usize, width: usize) {
+    term.move_cursor_to(x, y).unwrap();
+    term.write_str(&format!("{}", *CORNER)).unwrap();
+    for _ in 0..width {
+        term.write_str(&format!("{}", *BORDER_HORIZONTAL)).unwrap();
+    }
+    term.write_str(&format!("{}", *CORNER)).unwrap();
+}
+
+fn draw_field_on_term(
+    term: &Term,
+    field: &Vec<Vec<CellType>>,
+    x: usize,
+    y: usize,
+    with_top_border: bool,
+) {
+    if with_top_border {
+        draw_horizontal_border(term, x, y, field[0].len());
+    }
+
     for (i, row) in field.iter().enumerate() {
+        term.move_cursor_to(x, y + i).unwrap();
+        term.write_str(&format!("{}", *BORDER_VERTICAL)).unwrap();
         for (j, cell) in row.iter().enumerate() {
-            term.move_cursor_to(x + j * 2, y + i).unwrap();
             let s = match cell {
                 CellType::Empty => "  ",
                 CellType::Blasted => "@@",
@@ -52,5 +92,7 @@ fn draw_field_on_term(term: &Term, field: &Vec<Vec<CellType>>, x: usize, y: usiz
             let s = format!("{}", s);
             term.write_str(&s).unwrap();
         }
+        term.write_str(&format!("{}", *BORDER_VERTICAL)).unwrap();
     }
+    draw_horizontal_border(term, x, y + field.len(), field[0].len());
 }
