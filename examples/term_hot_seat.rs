@@ -4,7 +4,9 @@ use std::{
 };
 
 use console::{Key, Term};
-use gametetris_rs::{Action, PlayerSide, TetrisPair, TetrisPairTermDraw};
+use gametetris_rs::{
+    Action, GameFieldPair, PlainTermStyle, PlayerSide, StepResult, TermRender, TetrisPair,
+};
 
 // function which runs thread for reading key input and returns chamnel with key input
 fn read_key_input() -> Receiver<Key> {
@@ -17,12 +19,34 @@ fn read_key_input() -> Receiver<Key> {
     rx
 }
 
+fn key_to_action_player(key: &Key) -> Option<Action> {
+    match key {
+        Key::ArrowLeft => Some(Action::MoveLeft),
+        Key::ArrowRight => Some(Action::MoveRight),
+        Key::ArrowDown => Some(Action::MoveDown),
+        Key::ArrowUp => Some(Action::RotateLeft),
+        Key::Char(' ') => Some(Action::Drop),
+        _ => None,
+    }
+}
+
+fn key_to_action_opponent(key: &Key) -> Option<Action> {
+    match key {
+        Key::Char('a') => Some(Action::MoveLeft),
+        Key::Char('d') => Some(Action::MoveRight),
+        Key::Char('s') => Some(Action::MoveDown),
+        Key::Char('w') => Some(Action::RotateLeft),
+        Key::Char('q') => Some(Action::Drop),
+        _ => None,
+    }
+}
+
 fn main() {
     let term = Term::stdout();
 
     let key_rx = read_key_input();
     let mut tetris_pair = TetrisPair::default();
-    let mut tetris_term = TetrisPairTermDraw::new(tetris_pair.cols(), tetris_pair.rows());
+    let style = PlainTermStyle;
 
     // Setup ganme speed
     let step_delay = time::Duration::from_millis(10);
@@ -36,27 +60,23 @@ fn main() {
         let start = time::Instant::now();
         // Get key input from term without waiting
         while let Ok(key) = key_rx.try_recv() {
-            match key {
-                // Move left
-                Key::ArrowLeft => tetris_pair.add_player_action(PlayerSide::A, Action::MoveLeft),
-                // Move right
-                Key::ArrowRight => tetris_pair.add_player_action(PlayerSide::A, Action::MoveRight),
-                // Move down
-                Key::ArrowDown => tetris_pair.add_player_action(PlayerSide::A, Action::MoveDown),
-                // Rotate clockwise
-                Key::ArrowUp => tetris_pair.add_player_action(PlayerSide::A, Action::RotateLeft),
-                // Drop
-                Key::Char(' ') => tetris_pair.add_player_action(PlayerSide::A, Action::Drop),
-                // Quit
-                Key::Char('q') => break,
-                _ => {}
+            if let Some(action) = key_to_action_player(&key) {
+                tetris_pair.add_player_action(PlayerSide::Player, action);
+            }
+            if let Some(action) = key_to_action_opponent(&key) {
+                tetris_pair.add_player_action(PlayerSide::Opponent, action);
             }
         }
-        tetris_pair.step();
-
-        // Draw tetris field on term
-        let state = tetris_pair.get_player_game_state(PlayerSide::A);
-        tetris_term.update(&term, &state);
+        if tetris_pair.step() != (StepResult::None, StepResult::None) {
+            // Draw tetris field on term
+            let state = tetris_pair.get_state();
+            let field: GameFieldPair = state.into();
+            let lines = field.render(&style);
+            term.move_cursor_to(0, 0).unwrap();
+            for line in lines {
+                term.write_line(&line).unwrap();
+            }
+        }
 
         let elapsed = start.elapsed();
         if elapsed < step_delay {

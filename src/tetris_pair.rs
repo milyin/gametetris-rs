@@ -1,84 +1,81 @@
-use crate::tetris::{Action, StepResult, Tetris, TetrisGameState};
-use serde::Serialize;
+use crate::{
+    state::TetrisPairState,
+    tetris::{Action, StepResult, Tetris},
+};
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum PlayerSide {
-    A,
-    B,
-}
-
-#[derive(Serialize)]
-pub struct TetrisPairState {
-    pub player: TetrisGameState,
-    pub opponent: TetrisGameState,
+    Player,
+    Opponent,
 }
 
 #[derive(Default)]
 pub struct TetrisPair {
-    tetris_a: Tetris,
-    tetris_b: Tetris,
+    player: Tetris,
+    opponent: Tetris,
     // The step is performed when both players have called step method
     // This is to prevent one player from getting an advantage by calling step more often
-    step_a: bool,
-    step_b: bool,
+    step_player: bool,
+    step_opponent: bool,
     step_divergence: usize,
 }
 
 impl TetrisPair {
     pub fn new(cols: usize, rows: usize) -> TetrisPair {
         TetrisPair {
-            tetris_a: Tetris::new(cols, rows),
-            tetris_b: Tetris::new(cols, rows),
-            step_a: false,
-            step_b: false,
+            player: Tetris::new(cols, rows),
+            opponent: Tetris::new(cols, rows),
+            step_player: false,
+            step_opponent: false,
             step_divergence: 0,
         }
     }
 
     pub fn rows(&self) -> usize {
-        self.tetris_a.rows()
+        self.player.rows()
     }
 
     pub fn cols(&self) -> usize {
-        self.tetris_a.cols()
+        self.player.cols()
     }
 
     pub fn set_fall_speed(&mut self, lines: usize, steps: usize) {
-        self.tetris_a.set_fall_speed(lines, steps);
-        self.tetris_b.set_fall_speed(lines, steps);
+        self.player.set_fall_speed(lines, steps);
+        self.opponent.set_fall_speed(lines, steps);
     }
 
     pub fn set_drop_speed(&mut self, lines: usize, steps: usize) {
-        self.tetris_a.set_drop_speed(lines, steps);
-        self.tetris_b.set_drop_speed(lines, steps);
+        self.player.set_drop_speed(lines, steps);
+        self.opponent.set_drop_speed(lines, steps);
     }
 
     pub fn set_line_remove_speed(&mut self, lines: usize, steps: usize) {
-        self.tetris_a.set_line_remove_speed(lines, steps);
-        self.tetris_b.set_line_remove_speed(lines, steps);
+        self.player.set_line_remove_speed(lines, steps);
+        self.opponent.set_line_remove_speed(lines, steps);
     }
 
-    pub fn step(&mut self) {
-        self.step_a = false;
-        self.step_b = false;
-        let step_result_a = self.tetris_a.step();
-        let step_result_b = self.tetris_b.step();
-        if step_result_a == StepResult::LineRemoved {
-            self.tetris_b.add_action(Action::BottomRefill);
+    pub fn step(&mut self) -> (StepResult, StepResult) {
+        self.step_player = false;
+        self.step_opponent = false;
+        let step_result_player = self.player.step();
+        let step_result_opponent = self.opponent.step();
+        if step_result_player == StepResult::LineRemoved {
+            self.opponent.add_action(Action::BottomRefill);
         }
-        if step_result_b == StepResult::LineRemoved {
-            self.tetris_a.add_action(Action::BottomRefill);
+        if step_result_opponent == StepResult::LineRemoved {
+            self.player.add_action(Action::BottomRefill);
         }
+        (step_result_player, step_result_opponent)
     }
 
     /// Use this method when players have different control loops
     /// This guarantees that the game will run on frequiency of the slowest player
     pub fn step_player(&mut self, player: PlayerSide) -> usize {
         match player {
-            PlayerSide::A => self.step_a = true,
-            PlayerSide::B => self.step_b = true,
+            PlayerSide::Player => self.step_player = true,
+            PlayerSide::Opponent => self.step_opponent = true,
         }
-        if self.step_a && self.step_b {
+        if self.step_player && self.step_opponent {
             self.step();
             self.step_divergence = 0;
         } else {
@@ -89,25 +86,19 @@ impl TetrisPair {
 
     pub fn add_player_action(&mut self, player: PlayerSide, action: Action) {
         match player {
-            PlayerSide::A => self.tetris_a.add_action(action),
-            PlayerSide::B => self.tetris_b.add_action(action),
+            PlayerSide::Player => self.player.add_action(action),
+            PlayerSide::Opponent => self.opponent.add_action(action),
         }
     }
 
     pub fn is_game_over(&self) -> bool {
-        self.tetris_a.is_game_over() || self.tetris_b.is_game_over()
+        self.player.is_game_over() || self.opponent.is_game_over()
     }
 
-    pub fn get_player_game_state(&self, player: PlayerSide) -> TetrisPairState {
-        match player {
-            PlayerSide::A => TetrisPairState {
-                player: self.tetris_a.get_game_state(),
-                opponent: self.tetris_b.get_game_state(),
-            },
-            PlayerSide::B => TetrisPairState {
-                player: self.tetris_b.get_game_state(),
-                opponent: self.tetris_a.get_game_state(),
-            },
+    pub fn get_state(&self) -> TetrisPairState {
+        TetrisPairState {
+            player: self.player.get_state(),
+            opponent: self.opponent.get_state(),
         }
     }
 }

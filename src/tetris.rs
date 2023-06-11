@@ -1,4 +1,4 @@
-use crate::frequency_regulator::FrequencyRegulator;
+use crate::{frequency_regulator::FrequencyRegulator, state::TetrisState};
 use serde::Serialize;
 use std::collections::VecDeque;
 
@@ -454,7 +454,7 @@ pub struct Tetris {
     // Game over flag
     game_over: bool,
     // Game field
-    field: Field,
+    well: Field,
     // Preview field
     preview: Field,
     // Current tetromino
@@ -487,7 +487,7 @@ impl Tetris {
     pub fn new(cols: usize, rows: usize) -> Self {
         // Create new tetris game
         // Create game field, functional style
-        let field = Field::new(cols, rows);
+        let well = Field::new(cols, rows);
 
         // Create preview field, functional style
         let mut preview = Field::new(4, 4);
@@ -509,7 +509,7 @@ impl Tetris {
             cols,
             rows,
             game_over,
-            field,
+            well,
             preview,
             current: None,
             next,
@@ -622,7 +622,7 @@ impl Tetris {
     }
 
     pub fn get_field(&self) -> &Field {
-        &self.field
+        &self.well
     }
 
     pub fn get_preview(&self) -> &Field {
@@ -643,7 +643,7 @@ impl Tetris {
         let new_tetromino = Tetromino::new(self.next, Rotation::R0, self.cols as isize / 2 - 2, 0);
 
         // Check if new tetromino intersects with field borders or other tetrominos
-        if new_tetromino.intersects(&self.field) {
+        if new_tetromino.intersects(&self.well) {
             return false;
         }
         // Set new tetromino as current
@@ -675,7 +675,7 @@ impl Tetris {
             current.y as isize + y,
         );
         // Check if new tetromino intersects with field borders or other tetrominos
-        if new_tetromino.intersects(&self.field) {
+        if new_tetromino.intersects(&self.well) {
             return false;
         }
         *current = new_tetromino;
@@ -724,7 +724,7 @@ impl Tetris {
         // Push all lines up
         for y in 1..self.rows {
             for x in 0..self.cols {
-                self.field.set_cell(x, y - 1, self.field.get_cell(x, y));
+                self.well.set_cell(x, y - 1, self.well.get_cell(x, y));
             }
         }
         // Fill bottom line with random cells with probability of filled cell = 0.3
@@ -734,7 +734,7 @@ impl Tetris {
             } else {
                 CellType::Empty
             };
-            self.field.set_cell(x, self.rows - 1, cell_type);
+            self.well.set_cell(x, self.rows - 1, cell_type);
         }
         true
     }
@@ -745,7 +745,7 @@ impl Tetris {
         // Check if current tetromino exists
         if let Some(current) = self.current.take() {
             // Draw current tetromino on the field
-            current.draw(&mut self.field);
+            current.draw(&mut self.well);
         }
     }
 
@@ -757,7 +757,7 @@ impl Tetris {
         for y in 0..self.rows {
             let mut full_line = true;
             for x in 0..self.cols {
-                if self.field.get_cell(x, y) == CellType::Empty {
+                if self.well.get_cell(x, y) == CellType::Empty {
                     full_line = false;
                     break;
                 }
@@ -765,7 +765,7 @@ impl Tetris {
             if full_line {
                 full_lines = true;
                 for x in 0..self.cols {
-                    self.field.set_cell(x, y, CellType::Blasted);
+                    self.well.set_cell(x, y, CellType::Blasted);
                 }
             }
         }
@@ -779,7 +779,7 @@ impl Tetris {
         // Find topmost blasted line
         let mut top_blasted_line = None;
         for y in 0..self.rows {
-            if self.field.get_cell(0, y) == CellType::Blasted {
+            if self.well.get_cell(0, y) == CellType::Blasted {
                 top_blasted_line = Some(y);
                 break;
             }
@@ -791,29 +791,27 @@ impl Tetris {
         // Shift all lines above topmost blasted line down to one line
         for y in (0..top_blasted_line).rev() {
             for x in 0..self.cols {
-                self.field.set_cell(x, y + 1, self.field.get_cell(x, y));
+                self.well.set_cell(x, y + 1, self.well.get_cell(x, y));
             }
         }
         // Fill topmost line with Empty cells
         for x in 0..self.cols {
-            self.field.set_cell(x, 0, CellType::Empty);
+            self.well.set_cell(x, 0, CellType::Empty);
         }
         // Return true if there were blasted lines
         true
     }
 
     // get game state for serialization
-    pub fn get_game_state(&self) -> TetrisGameState {
-        let mut field = self.field.clone();
+    pub fn get_state(&self) -> TetrisState {
+        let mut field = self.well.clone();
         // draw current tetromino on the field
         if let Some(current) = &self.current {
             current.draw(&mut field);
         }
         let preview = self.preview.clone();
-        TetrisGameState {
-            cols: self.cols,
-            rows: self.rows,
-            field,
+        TetrisState {
+            well: field,
             preview,
             game_over: self.game_over,
         }
@@ -822,13 +820,4 @@ impl Tetris {
     pub fn is_game_over(&self) -> bool {
         self.game_over
     }
-}
-
-#[derive(Serialize)]
-pub struct TetrisGameState {
-    pub cols: usize,
-    pub rows: usize,
-    pub field: Field,
-    pub preview: Field,
-    pub game_over: bool,
 }
