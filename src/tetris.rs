@@ -1,8 +1,8 @@
 use crate::{frequency_regulator::FrequencyRegulator, state::TetrisState};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CellType {
     Empty = 0,
     Blasted,
@@ -13,16 +13,6 @@ pub enum CellType {
     S,
     T,
     Z,
-}
-
-// implement serialize/deserialize considering that CellType implements FromPrimitive trait
-impl serde::Serialize for CellType {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_u64(*self as u64)
-    }
 }
 
 impl CellType {
@@ -367,7 +357,7 @@ impl Tetromino {
 }
 
 // Enum with all possible user actions
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum Action {
     MoveLeft,
     MoveRight,
@@ -378,7 +368,7 @@ pub enum Action {
     BottomRefill,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Field {
     // Field width
     cols: usize,

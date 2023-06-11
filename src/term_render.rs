@@ -307,29 +307,29 @@ impl TermRender for GameFieldRight {
 }
 
 pub struct GameFieldPair {
-    player: GameFieldLeft,
-    opponent: GameFieldRight,
+    opponent: GameFieldLeft,
+    player: GameFieldRight,
 }
 
 impl From<TetrisPairState> for GameFieldPair {
     fn from(state: TetrisPairState) -> Self {
-        let player = GameFieldLeft::from(state.player);
-        let opponent = GameFieldRight::from(state.opponent);
-        Self { player, opponent }
+        let opponent = GameFieldLeft::from(state.opponent);
+        let player = GameFieldRight::from(state.player);
+        Self { opponent, player }
     }
 }
 
 impl TermRender for GameFieldPair {
     fn output(&self, style: &impl TermStyle) -> Vec<Vec<TermCell>> {
-        let mut lines = self.player.output(style);
-        let opponent_block = self.opponent.output(style);
+        let mut lines = self.opponent.output(style);
+        let right_block = self.player.output(style);
         // Append opponent lines to player lines, padding with TermCell::Space
-        for (player_line, mut opponent_line) in lines.iter_mut().zip(opponent_block.into_iter()) {
-            player_line.push(TermCell::Space);
-            player_line.push(TermCell::Space);
-            player_line.push(TermCell::Space);
-            player_line.push(TermCell::Space);
-            player_line.append(&mut opponent_line);
+        for (line, mut right_line) in lines.iter_mut().zip(right_block.into_iter()) {
+            line.push(TermCell::Space);
+            line.push(TermCell::Space);
+            line.push(TermCell::Space);
+            line.push(TermCell::Space);
+            line.append(&mut right_line);
         }
         lines
     }
