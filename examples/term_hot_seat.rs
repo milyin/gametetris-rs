@@ -5,7 +5,7 @@ use std::{
 
 use console::{Key, Term};
 use gametetris_rs::{
-    Action, GameFieldPair, PlainTermStyle, PlayerSide, StepResult, TermRender, TetrisPair,
+    Action, AnsiTermStyle, GameFieldPair, PlayerSide, StepResult, TermRender, TetrisPair,
 };
 
 // function which runs thread for reading key input and returns chamnel with key input
@@ -46,7 +46,10 @@ fn main() {
 
     let key_rx = read_key_input();
     let mut tetris_pair = TetrisPair::default();
-    let style = PlainTermStyle;
+
+    term.clear_screen().unwrap();
+    term.hide_cursor().unwrap();
+    let style = AnsiTermStyle;
 
     // Setup ganme speed
     let step_delay = time::Duration::from_millis(10);
@@ -54,8 +57,6 @@ fn main() {
     tetris_pair.set_drop_speed(1, 1);
     tetris_pair.set_line_remove_speed(3, 5);
 
-    term.clear_screen().unwrap();
-    term.hide_cursor().unwrap();
     loop {
         let start = time::Instant::now();
         // Get key input from term without waiting
