@@ -5,6 +5,8 @@ mod tetris;
 mod tetris_pair;
 
 pub use frequency_regulator::FrequencyRegulator;
+pub use state::TetrisPairState;
+pub use state::TetrisState;
 pub use term_render::pad_block_right;
 pub use term_render::render_block;
 pub use term_render::AnsiTermStyle;
