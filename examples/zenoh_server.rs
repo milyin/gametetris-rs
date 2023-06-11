@@ -1,4 +1,4 @@
-use std::{sync::Arc, thread, time};
+use std::{thread, time};
 
 use console::{Key, Term};
 use flume::{unbounded, Receiver};
@@ -8,9 +8,9 @@ use gametetris_rs::{
 };
 use human_hash::humanize;
 use zenoh::{
-    prelude::{keyexpr, sync::SyncResolve, Config, KeyExpr},
-    queryable::{self, Query, Queryable},
-    sample::{self, Sample},
+    prelude::{sync::SyncResolve, Config, KeyExpr},
+    queryable::{Query, Queryable},
+    sample::Sample,
     subscriber::Subscriber,
     Session,
 };

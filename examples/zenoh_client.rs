@@ -2,11 +2,9 @@ use std::{sync::Arc, thread};
 
 use console::{Key, Term};
 use gametetris_rs::{Action, AnsiTermStyle, GameFieldPair, TermRender, TetrisPairState};
-use human_hash::humanize;
+
 use zenoh::{
-    prelude::{r#async::AsyncResolve, sync::SyncResolve, Config, KeyExpr},
-    publication::Publisher,
-    query::Reply,
+    prelude::{sync::SyncResolve, Config, KeyExpr},
     Session,
 };
 

@@ -6,7 +6,6 @@ use gametetris_rs::{
     Action, AnsiTermStyle, GameFieldPair, PlayerSide, StepResult, TermRender, TetrisPair,
     TetrisPairState,
 };
-use human_hash::humanize;
 
 fn start_tetris_thread(
     player_name: String,
