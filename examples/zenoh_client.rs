@@ -1,24 +1,31 @@
-use std::thread;
+use std::{sync::Arc, thread};
 
-use async_std::channel::{self, Receiver};
 use console::{Key, Term};
-use futures::select;
-use gametetris_rs::Action;
+use gametetris_rs::{Action, AnsiTermStyle, GameFieldPair, TermRender, TetrisPairState};
 use human_hash::humanize;
 use zenoh::{
-    prelude::{r#async::AsyncResolve, Config, KeyExpr},
+    prelude::{r#async::AsyncResolve, sync::SyncResolve, Config, KeyExpr},
+    publication::Publisher,
     query::Reply,
+    Session,
 };
 
-// function which runs thread for reading key input and returns chamnel with key input
-fn read_key_input() -> Receiver<Key> {
+fn start_read_key_thread(session: Arc<Session>, action_keyexpr: KeyExpr) {
     let term = Term::stdout();
-    let (tx, rx) = channel::unbounded();
-    thread::spawn(move || loop {
-        let key = term.read_key().unwrap();
-        tx.send(key)
+    let action_keyexpr = action_keyexpr.clone().into_owned();
+    thread::spawn(move || {
+        let publisher = session
+            .declare_publisher(&action_keyexpr)
+            .res_sync()
+            .unwrap();
+        loop {
+            let key = term.read_key().unwrap();
+            if let Some(action) = key_to_action_player(&key) {
+                let value = serde_json::to_string(&action).unwrap();
+                publisher.put(value).res_sync().unwrap();
+            }
+        }
     });
-    rx
 }
 
 fn key_to_action_player(key: &Key) -> Option<Action> {
@@ -32,57 +39,60 @@ fn key_to_action_player(key: &Key) -> Option<Action> {
     }
 }
 
-#[async_std::main]
-async fn main() {
-    let config = Config::default();
-    let session = zenoh::open(config).res_async().await.unwrap();
-    let player_name = humanize(&uuid::Uuid::new_v4(), 2);
-    let player_keyexpr = format!("tetris/{}", player_name);
-    let player_keyexpr = KeyExpr::new(player_keyexpr).unwrap();
+fn main() {
+    let term = Term::stdout();
 
-    println!("Player name: {}", player_name);
-    let receiver = session.get("tetris/*").res_async().await.unwrap();
-    let mut players = Vec::new();
-    while let Ok(reply) = receiver.recv_async().await {
+    let config = Config::default();
+    let session = Arc::new(zenoh::open(config).res_sync().unwrap());
+
+    let receiver = session.get("tetris/*").res_sync().unwrap();
+    let mut servers = Vec::new();
+    while let Ok(reply) = receiver.recv() {
         if let Ok(sample) = reply.sample {
-            players.push(sample);
+            servers.push(sample);
         }
     }
-    if players.len() == 0 {
-        println!("No players found");
+    if servers.len() == 0 {
+        println!("No servers found");
         return;
     }
-    println!("Select player:");
-    for n in 0..players.len() {
-        println!("{}: {}", n, players[n].value);
+    println!("Select server:");
+    for n in 0..servers.len() {
+        println!("{}: {}", n, servers[n].key_expr);
     }
     let n = loop {
         let mut line = String::new();
         std::io::stdin().read_line(&mut line).unwrap();
         let n = line.trim().parse::<usize>().unwrap();
-        if n < players.len() {
+        if n < servers.len() {
             break n;
         }
     };
-    let opponent_name: String = players[n].value.to_string();
-    let opponent_keyexpr = &players[n].key_expr;
-    println!("Selected player: {} at {}", opponent_name, opponent_keyexpr);
-    session
-        .put(opponent_keyexpr, player_keyexpr.to_string())
-        .res_async()
-        .await
+    let server_keyexpr = &servers[n].key_expr;
+    println!("Selected server: {}", server_keyexpr);
+
+    let action_keyexpr = server_keyexpr.join("action").unwrap();
+    let gamestate_keyexpr = server_keyexpr.join("gamestate").unwrap();
+
+    start_read_key_thread(session.clone(), action_keyexpr);
+
+    let subscriber = session
+        .declare_subscriber(&gamestate_keyexpr)
+        .res_sync()
         .unwrap();
 
-    let key_input = read_key_input();
+    while let Ok(sample) = subscriber.recv() {
+        let mut state: TetrisPairState =
+            serde_json::from_str(sample.value.to_string().as_str()).unwrap();
 
-    loop {
-        select!(
-            key = key_input.recv_async() => {
-                if let Some(action) = key_to_action_player(&key.unwrap()) {
-                    tetris_pair.step_player(action);
-                }
-            },
-
-        )
+        // Draw tetris field on term
+        state.swap();
+        state.player.name = "PLAYER".to_string();
+        let field: GameFieldPair = state.into();
+        let lines = field.render(&AnsiTermStyle);
+        term.move_cursor_to(0, 0).unwrap();
+        for line in lines {
+            term.write_line(&line).unwrap();
+        }
     }
 }

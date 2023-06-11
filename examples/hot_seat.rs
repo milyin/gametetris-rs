@@ -1,23 +1,65 @@
-use std::{
-    sync::mpsc::{channel, Receiver},
-    thread, time,
-};
+use std::{thread, time};
 
 use console::{Key, Term};
+use flume::{unbounded, Receiver};
 use gametetris_rs::{
     Action, AnsiTermStyle, GameFieldPair, PlayerSide, StepResult, TermRender, TetrisPair,
+    TetrisPairState,
 };
 use human_hash::humanize;
 
-// function which runs thread for reading key input and returns chamnel with key input
-fn read_key_input() -> Receiver<Key> {
-    let term = Term::stdout();
-    let (tx, rx) = channel();
-    thread::spawn(move || loop {
-        let key = term.read_key().unwrap();
-        tx.send(key).unwrap();
+fn start_tetris_thread(
+    player_name: String,
+    opponent_name: String,
+    player_actions: Receiver<Action>,
+    opponent_actions: Receiver<Action>,
+) -> Receiver<TetrisPairState> {
+    let (tx, rx) = unbounded();
+    thread::spawn(move || {
+        let mut tetris_pair = TetrisPair::new(player_name, opponent_name, 10, 20);
+
+        // Setup ganme speed
+        let step_delay = time::Duration::from_millis(10);
+        tetris_pair.set_fall_speed(1, 30);
+        tetris_pair.set_drop_speed(1, 1);
+        tetris_pair.set_line_remove_speed(3, 5);
+
+        loop {
+            let start = time::Instant::now();
+            while let Ok(action) = player_actions.try_recv() {
+                tetris_pair.add_player_action(PlayerSide::Player, action);
+            }
+            while let Ok(action) = opponent_actions.try_recv() {
+                tetris_pair.add_player_action(PlayerSide::Opponent, action);
+            }
+
+            if tetris_pair.step() != (StepResult::None, StepResult::None) {
+                tx.send(tetris_pair.get_state()).unwrap();
+            }
+
+            let elapsed = start.elapsed();
+            if elapsed < step_delay {
+                thread::sleep(step_delay - elapsed);
+            }
+        }
     });
     rx
+}
+
+fn start_read_key_thread() -> (Receiver<Action>, Receiver<Action>) {
+    let term = Term::stdout();
+    let (tx_player, rx_player) = unbounded();
+    let (tx_opponent, rx_opponent) = unbounded();
+    thread::spawn(move || loop {
+        let key = term.read_key().unwrap();
+        if let Some(action) = key_to_action_player(&key) {
+            tx_player.send(action).unwrap();
+        }
+        if let Some(action) = key_to_action_opponent(&key) {
+            tx_opponent.send(action).unwrap();
+        }
+    });
+    (rx_player, rx_opponent)
 }
 
 fn key_to_action_player(key: &Key) -> Option<Action> {
@@ -45,48 +87,22 @@ fn key_to_action_opponent(key: &Key) -> Option<Action> {
 fn main() {
     let term = Term::stdout();
 
-    // Generate two random player names
-    let player_name = humanize(&uuid::Uuid::new_v4(), 2);
-    let opponent_name = humanize(&uuid::Uuid::new_v4(), 2);
-
-    let key_rx = read_key_input();
-    let mut tetris_pair = TetrisPair::new(player_name, opponent_name, 10, 20);
+    let (action_rx_player, action_rx_opponent) = start_read_key_thread();
+    let state_rx = start_tetris_thread(
+        "PLAYER".to_string(),
+        "OPPONENT".to_string(),
+        action_rx_player,
+        action_rx_opponent,
+    );
 
     term.clear_screen().unwrap();
-    term.hide_cursor().unwrap();
-    let style = AnsiTermStyle;
-
-    // Setup ganme speed
-    let step_delay = time::Duration::from_millis(10);
-    tetris_pair.set_fall_speed(1, 30);
-    tetris_pair.set_drop_speed(1, 1);
-    tetris_pair.set_line_remove_speed(3, 5);
-
-    loop {
-        let start = time::Instant::now();
-        // Get key input from term without waiting
-        while let Ok(key) = key_rx.try_recv() {
-            if let Some(action) = key_to_action_player(&key) {
-                tetris_pair.add_player_action(PlayerSide::Player, action);
-            }
-            if let Some(action) = key_to_action_opponent(&key) {
-                tetris_pair.add_player_action(PlayerSide::Opponent, action);
-            }
-        }
-        if tetris_pair.step() != (StepResult::None, StepResult::None) {
-            // Draw tetris field on term
-            let state = tetris_pair.get_state();
-            let field: GameFieldPair = state.into();
-            let lines = field.render(&style);
-            term.move_cursor_to(0, 0).unwrap();
-            for line in lines {
-                term.write_line(&line).unwrap();
-            }
-        }
-
-        let elapsed = start.elapsed();
-        if elapsed < step_delay {
-            thread::sleep(step_delay - elapsed);
+    while let Ok(state) = state_rx.recv() {
+        // Draw tetris field on term
+        let field: GameFieldPair = state.into();
+        let lines = field.render(&AnsiTermStyle);
+        term.move_cursor_to(0, 0).unwrap();
+        for line in lines {
+            term.write_line(&line).unwrap();
         }
     }
 }
