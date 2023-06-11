@@ -1,25 +1,12 @@
 use std::thread;
 
-use async_std::channel::{self, Receiver};
 use console::{Key, Term};
-use futures::select;
 use gametetris_rs::Action;
 use human_hash::humanize;
 use zenoh::{
-    prelude::{r#async::AsyncResolve, Config, KeyExpr},
+    prelude::{r#async::AsyncResolve, sync::SyncResolve, Config, KeyExpr},
     query::Reply,
 };
-
-// function which runs thread for reading key input and returns chamnel with key input
-fn read_key_input() -> Receiver<Key> {
-    let term = Term::stdout();
-    let (tx, rx) = channel::unbounded();
-    thread::spawn(move || loop {
-        let key = term.read_key().unwrap();
-        tx.send(key)
-    });
-    rx
-}
 
 fn key_to_action_player(key: &Key) -> Option<Action> {
     match key {
@@ -32,18 +19,17 @@ fn key_to_action_player(key: &Key) -> Option<Action> {
     }
 }
 
-#[async_std::main]
-async fn main() {
+fn main() {
     let config = Config::default();
-    let session = zenoh::open(config).res_async().await.unwrap();
+    let session = zenoh::open(config).res_sync().unwrap();
     let player_name = humanize(&uuid::Uuid::new_v4(), 2);
     let player_keyexpr = format!("tetris/{}", player_name);
     let player_keyexpr = KeyExpr::new(player_keyexpr).unwrap();
 
     println!("Player name: {}", player_name);
-    let receiver = session.get("tetris/*").res_async().await.unwrap();
+    let receiver = session.get("tetris/*").res_sync().unwrap();
     let mut players = Vec::new();
-    while let Ok(reply) = receiver.recv_async().await {
+    while let Ok(reply) = receiver.recv() {
         if let Ok(sample) = reply.sample {
             players.push(sample);
         }
@@ -68,21 +54,20 @@ async fn main() {
     let opponent_keyexpr = &players[n].key_expr;
     println!("Selected player: {} at {}", opponent_name, opponent_keyexpr);
     session
-        .put(opponent_keyexpr, player_keyexpr.to_string())
-        .res_async()
-        .await
+        .put(opponent_keyexpr, player_name.to_string())
+        .res_sync()
         .unwrap();
 
-    let key_input = read_key_input();
+    // let key_input = read_key_input();
 
-    loop {
-        select!(
-            key = key_input.recv_async() => {
-                if let Some(action) = key_to_action_player(&key.unwrap()) {
-                    tetris_pair.step_player(action);
-                }
-            },
+    // loop {
+    //     select!(
+    //         key = key_input.recv_async() => {
+    //             if let Some(action) = key_to_action_player(&key.unwrap()) {
+    //                 tetris_pair.step_player(action);
+    //             }
+    //         },
 
-        )
-    }
+    //     )
+    // }
 }

@@ -37,11 +37,20 @@ async fn main() {
         .await
         .unwrap();
 
-    if let Ok(sample) = subscriber.recv_async().await {
-        println!("Player {} at {}", sample.value, sample.key_expr);
-    }
+    let opponent_keyexpr = loop {
+        if let Ok(sample) = subscriber.recv_async().await {
+            println!(
+                "Player {} requests fight with {}",
+                sample.value, sample.key_expr
+            );
+            if sample.key_expr == keyexpr {
+                println!("Request accepted!");
+                break sample.value.to_string();
+            }
+        } else {
+            panic!("Listener unexpectedly closed");
+        }
+    };
 
-    // read line from stdin
-    let mut line = String::new();
-    std::io::stdin().read_line(&mut line).unwrap();
+    println!("Selected opponent {}", opponent_keyexpr);
 }
