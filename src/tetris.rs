@@ -475,16 +475,12 @@ pub struct Tetris {
     line_remove_delay: Option<usize>,
     // Game score
     _score: usize,
-}
-
-impl Default for Tetris {
-    fn default() -> Self {
-        Tetris::new(10, 20)
-    }
+    // Player name
+    name: String,
 }
 
 impl Tetris {
-    pub fn new(cols: usize, rows: usize) -> Self {
+    pub fn new(name: String, cols: usize, rows: usize) -> Self {
         // Create new tetris game
         // Create game field, functional style
         let well = Field::new(cols, rows);
@@ -520,6 +516,7 @@ impl Tetris {
             line_remove_speed: FrequencyRegulator::new(1, 3),
             line_remove_delay: None,
             _score,
+            name,
         }
     }
 
@@ -804,15 +801,16 @@ impl Tetris {
 
     // get game state for serialization
     pub fn get_state(&self) -> TetrisState {
-        let mut field = self.well.clone();
+        let mut well = self.well.clone();
         // draw current tetromino on the field
         if let Some(current) = &self.current {
-            current.draw(&mut field);
+            current.draw(&mut well);
         }
         let preview = self.preview.clone();
         TetrisState {
-            well: field,
+            well,
             preview,
+            name: self.name.clone(),
             game_over: self.game_over,
         }
     }

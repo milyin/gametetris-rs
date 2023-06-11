@@ -9,7 +9,6 @@ pub enum PlayerSide {
     Opponent,
 }
 
-#[derive(Default)]
 pub struct TetrisPair {
     player: Tetris,
     opponent: Tetris,
@@ -21,10 +20,10 @@ pub struct TetrisPair {
 }
 
 impl TetrisPair {
-    pub fn new(cols: usize, rows: usize) -> TetrisPair {
+    pub fn new(player_name: String, opponent_name: String, cols: usize, rows: usize) -> TetrisPair {
         TetrisPair {
-            player: Tetris::new(cols, rows),
-            opponent: Tetris::new(cols, rows),
+            player: Tetris::new(player_name, cols, rows),
+            opponent: Tetris::new(opponent_name, cols, rows),
             step_player: false,
             step_opponent: false,
             step_divergence: 0,

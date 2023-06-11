@@ -7,6 +7,7 @@ use console::{Key, Term};
 use gametetris_rs::{
     Action, AnsiTermStyle, GameFieldPair, PlayerSide, StepResult, TermRender, TetrisPair,
 };
+use human_hash::humanize;
 
 // function which runs thread for reading key input and returns chamnel with key input
 fn read_key_input() -> Receiver<Key> {
@@ -44,8 +45,12 @@ fn key_to_action_opponent(key: &Key) -> Option<Action> {
 fn main() {
     let term = Term::stdout();
 
+    // Generate two random player names
+    let player_name = humanize(&uuid::Uuid::new_v4(), 2);
+    let opponent_name = humanize(&uuid::Uuid::new_v4(), 2);
+
     let key_rx = read_key_input();
-    let mut tetris_pair = TetrisPair::default();
+    let mut tetris_pair = TetrisPair::new(player_name, opponent_name, 10, 20);
 
     term.clear_screen().unwrap();
     term.hide_cursor().unwrap();
