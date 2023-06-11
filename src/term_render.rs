@@ -106,6 +106,45 @@ impl TermStyle for PlainTermStyle {
     }
 }
 
+pub struct AnsiTermStyle;
+
+impl TermStyle for AnsiTermStyle {
+    fn display<'a>(&self, cell: &'a TermCell) -> &'a str {
+        match cell {
+            TermCell::FieldCell(CellType::Empty) => "\x1b[0m  ",
+            TermCell::FieldCell(CellType::Blasted) => "\x1b[0m**",
+            TermCell::FieldCell(CellType::I) => "\x1b[0;34m[]",
+            TermCell::FieldCell(CellType::J) => "\x1b[0;32m[]",
+            TermCell::FieldCell(CellType::L) => "\x1b[0;33m[]",
+            TermCell::FieldCell(CellType::O) => "\x1b[0;35m[]",
+            TermCell::FieldCell(CellType::S) => "\x1b[0;36m[]",
+            TermCell::FieldCell(CellType::T) => "\x1b[0;37m[]",
+            TermCell::FieldCell(CellType::Z) => "\x1b[0;31m[]",
+            TermCell::BorderVertical => "\x1b[0m|",
+            TermCell::BorderTopLeft => "\x1b[0m┌",
+            TermCell::BorderTopRight => "\x1b[0m┐",
+            TermCell::BorderBottomLeft => "\x1b[0m└",
+            TermCell::BorderHorizontal => "\x1b[0m--",
+            TermCell::BorderBottomRight => "\x1b[0m┘",
+            TermCell::Space => " ",
+            TermCell::Message(s) => s.as_str(),
+        }
+    }
+    fn width(&self, cell: &TermCell) -> usize {
+        match cell {
+            TermCell::FieldCell(_) => 2,
+            TermCell::BorderVertical => 1,
+            TermCell::BorderHorizontal => 2,
+            TermCell::BorderTopLeft
+            | TermCell::BorderTopRight
+            | TermCell::BorderBottomLeft
+            | TermCell::BorderBottomRight => 1,
+            TermCell::Space => 1,
+            TermCell::Message(s) => s.len(),
+        }
+    }
+}
+
 impl TermRender for Field {
     fn output(&self, _style: &impl TermStyle) -> Vec<Vec<TermCell>> {
         let mut lines = Vec::new();
@@ -121,18 +160,38 @@ impl TermRender for Field {
     }
 }
 
-pub struct WellField(Field);
+pub struct WellField {
+    field: Field,
+    game_over: bool,
+}
+
+impl WellField {
+    pub fn new(field: Field, game_over: bool) -> Self {
+        Self { field, game_over }
+    }
+}
 
 impl TermRender for WellField {
     fn output(&self, style: &impl TermStyle) -> Vec<Vec<TermCell>> {
-        let mut lines = self.0.output(style);
+        let mut lines = self.field.output(style);
+        if self.game_over {
+            // Find middle line of the field
+            let middle = lines.len() / 2;
+            // Replace line with message
+            let message = TermCell::Message("     Game Over".to_string());
+            lines[middle] = vec![message];
+            // Add padding
+            // TODO: Center the message
+            pad_block_right(&mut lines, style);
+        }
+
         for line in &mut lines {
             line.insert(0, TermCell::BorderVertical);
             line.push(TermCell::BorderVertical);
         }
         let mut line = Vec::new();
         line.push(TermCell::BorderBottomLeft);
-        for _ in 0..self.0.cols() {
+        for _ in 0..self.field.cols() {
             line.push(TermCell::BorderHorizontal);
         }
         line.push(TermCell::BorderBottomRight);
@@ -178,7 +237,7 @@ pub struct GameFieldLeft {
 
 impl From<TetrisState> for GameFieldLeft {
     fn from(state: TetrisState) -> Self {
-        let well = WellField(state.well);
+        let well = WellField::new(state.well, state.game_over);
         let preview = PreviewField(state.preview);
         Self { well, preview }
     }
@@ -206,7 +265,7 @@ pub struct GameFieldRight {
 
 impl From<TetrisState> for GameFieldRight {
     fn from(state: TetrisState) -> Self {
-        let well = WellField(state.well);
+        let well = WellField::new(state.well, state.game_over);
         let preview = PreviewField(state.preview);
         Self { well, preview }
     }
