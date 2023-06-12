@@ -9,10 +9,8 @@ use gametetris_rs::{
 use human_hash::humanize;
 use zenoh::{
     prelude::{sync::SyncResolve, Config, KeyExpr},
-    queryable::{Query, Queryable},
+    queryable::Query,
     sample::Sample,
-    subscriber::Subscriber,
-    Session,
 };
 
 fn start_tetris_thread(
@@ -76,78 +74,61 @@ fn key_to_action_player(key: &Key) -> Option<Action> {
     }
 }
 
-fn start_opponent_action_subscriber<'a>(
-    session: &'a Session,
-    server_keyexpr: &KeyExpr,
-) -> (Subscriber<'a, ()>, Receiver<Action>) {
-    let (tx_opponent, rx_opponent) = unbounded();
-    let callback = move |sample: Sample| {
-        let value = sample.value.to_string();
-        let action: Action = serde_json::from_str(&value).unwrap();
-        tx_opponent.send(action).unwrap();
-    };
-    let subscriber = session
-        .declare_subscriber(server_keyexpr)
-        .callback_mut(callback)
-        .res()
-        .unwrap();
-    (subscriber, rx_opponent)
-}
-
-fn start_game_server_queryable<'a>(
-    session: &'a Session,
-    server_keyexpr: &KeyExpr,
-) -> Queryable<'a, ()> {
-    let callback = {
-        let server_keyexpr = server_keyexpr.clone().into_owned();
-        move |query: Query| {
-            let sample = Sample::new(server_keyexpr.clone(), "".to_string());
-            query.reply(Ok(sample)).res_sync().unwrap();
-        }
-    };
-    let queryable = session
-        .declare_queryable(server_keyexpr)
-        .callback(callback)
-        .res()
-        .unwrap();
-    queryable
-}
-
 fn main() {
     let term = Term::stdout();
 
-    // Generate two random player names
-    let server_name = humanize(&uuid::Uuid::new_v4(), 2);
-
     let config = Config::default();
-    let session = zenoh::open(config).res().unwrap();
-    let server_keyexpr = format!("tetris/{}", server_name);
-    let server_keyexpr = KeyExpr::new(&server_keyexpr).unwrap();
-    let action_keyexpr = format!("tetris/{}/action", server_name);
-    let action_keyexpr = KeyExpr::new(&action_keyexpr).unwrap();
-    let gamestate_keyexpr = format!("tetris/{}/gamestate", server_name);
-    let gamestate_keyexpr = KeyExpr::new(&gamestate_keyexpr).unwrap();
+    let session = zenoh::open(config).res_sync().unwrap();
 
-    let _queyable = start_game_server_queryable(&session, &server_keyexpr);
+    let server_name = humanize(&uuid::Uuid::new_v4(), 2);
+    let base_keyexpr = format!("tetris/{}", server_name);
+    let base_keyexpr = KeyExpr::new(base_keyexpr).unwrap();
+    let gamestate_keyexpr = base_keyexpr.join("gamestate").unwrap();
+    let action_keyexpr = base_keyexpr.join("action").unwrap();
 
-    let (_subscriber, action_rx_opponent) =
-        start_opponent_action_subscriber(&session, &action_keyexpr);
+    let discovery_callback = {
+        let base_keyexpr = base_keyexpr.clone();
+        move |query: Query| {
+            let sample = Sample::new(base_keyexpr.clone(), "");
+            query.reply(Ok(sample)).res_sync().unwrap();
+        }
+    };
 
-    let publisher = session.declare_publisher(&gamestate_keyexpr).res().unwrap();
+    let _queryable = session
+        .declare_queryable(base_keyexpr)
+        .callback(discovery_callback)
+        .res_sync()
+        .unwrap();
+
+    let publisher = session
+        .declare_publisher(gamestate_keyexpr)
+        .res_sync()
+        .unwrap();
+
+    let (action_tx_opponent, action_rx_opponent) = unbounded();
+    let action_callback = move |sample: Sample| {
+        let s = sample.value.to_string();
+        let action = serde_json::from_str(s.as_str()).unwrap();
+        action_tx_opponent.send(action).unwrap();
+    };
+    let _subscriber = session
+        .declare_subscriber(action_keyexpr)
+        .callback(action_callback)
+        .res_sync()
+        .unwrap();
 
     let action_rx_player = start_read_key_thread();
     let state_rx = start_tetris_thread(
-        server_name.clone(),
-        "REMOTE".to_string(),
+        server_name,
+        "OPPONENT".to_string(),
         action_rx_player,
         action_rx_opponent,
     );
 
     term.clear_screen().unwrap();
     while let Ok(state) = state_rx.recv() {
-        // Publish state
         let value = serde_json::to_string(&state).unwrap();
-        publisher.put(value).res().unwrap();
+        publisher.put(value).res_sync().unwrap();
 
         // Draw tetris field on term
         let field: GameFieldPair = state.into();

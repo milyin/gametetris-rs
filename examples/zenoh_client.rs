@@ -47,7 +47,7 @@ fn main() {
     let mut servers = Vec::new();
     while let Ok(reply) = receiver.recv() {
         if let Ok(sample) = reply.sample {
-            servers.push(sample);
+            servers.push(sample.key_expr);
         }
     }
     if servers.len() == 0 {
@@ -56,7 +56,7 @@ fn main() {
     }
     println!("Select server:");
     for n in 0..servers.len() {
-        println!("{}: {}", n, servers[n].key_expr);
+        println!("{}: {}", n, servers[n]);
     }
     let n = loop {
         let mut line = String::new();
@@ -66,7 +66,7 @@ fn main() {
             break n;
         }
     };
-    let server_keyexpr = &servers[n].key_expr;
+    let server_keyexpr = &servers[n];
     println!("Selected server: {}", server_keyexpr);
 
     let action_keyexpr = server_keyexpr.join("action").unwrap();
