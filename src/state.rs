@@ -6,7 +6,6 @@ use crate::Field;
 pub struct TetrisState {
     pub well: Field,
     pub preview: Field,
-    pub name: String,
     pub game_over: bool,
 }
 

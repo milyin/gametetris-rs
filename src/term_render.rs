@@ -233,19 +233,14 @@ impl TermRender for PreviewField {
 pub struct GameFieldLeft {
     well: WellField,
     preview: PreviewField,
-    name: String,
+    text: Vec<String>,
 }
 
-impl From<TetrisState> for GameFieldLeft {
-    fn from(state: TetrisState) -> Self {
+impl GameFieldLeft {
+    fn new(state: TetrisState, text: Vec<String>) -> Self {
         let well = WellField::new(state.well, state.game_over);
         let preview = PreviewField(state.preview);
-        let name = state.name;
-        Self {
-            well,
-            preview,
-            name,
-        }
+        Self { well, preview, text }
     }
 }
 
@@ -255,7 +250,7 @@ impl TermRender for GameFieldLeft {
         let mut preview_block = self.preview.output(style);
         // Append empty line and player name after preview block
         preview_block.push(Vec::new());
-        preview_block.push(vec![TermCell::Message(self.name.clone())]);
+        preview_block.extend(self.text.iter().map(|s| vec![TermCell::Message(s.clone())]));
         // Append preview lines to well lines, padding with TermCell::Space
         // Preview is always shorter than well
         for (well_line, mut preview_line) in lines.iter_mut().zip(preview_block.into_iter()) {
@@ -270,19 +265,14 @@ impl TermRender for GameFieldLeft {
 pub struct GameFieldRight {
     well: WellField,
     preview: PreviewField,
-    name: String,
+    text: Vec<String>,
 }
 
-impl From<TetrisState> for GameFieldRight {
-    fn from(state: TetrisState) -> Self {
+impl GameFieldRight {
+    fn new(state: TetrisState, text: Vec<String>) -> Self {
         let well = WellField::new(state.well, state.game_over);
         let preview = PreviewField(state.preview);
-        let name = state.name;
-        Self {
-            well,
-            preview,
-            name,
-        }
+        Self { well, preview, text }
     }
 }
 
@@ -290,9 +280,9 @@ impl TermRender for GameFieldRight {
     fn output(&self, style: &impl TermStyle) -> Vec<Vec<TermCell>> {
         let mut lines = self.preview.output(style);
         let well_block = self.well.output(style);
-        // Append empty line and player name after preview block
+        // Append empty line and text after preview block
         lines.push(Vec::new());
-        lines.push(vec![TermCell::Message(self.name.clone())]);
+        lines.extend(self.text.iter().map(|s| vec![TermCell::Message(s.clone())]));
         // extend height of lines to the height of well_block and then pad it with TermCell::Space
         // Preview is always shorter than well
         lines.resize(well_block.len(), Vec::new());
@@ -311,12 +301,12 @@ pub struct GameFieldPair {
     player: GameFieldRight,
 }
 
-impl From<TetrisPairState> for GameFieldPair {
-    fn from(state: TetrisPairState) -> Self {
-        let opponent = GameFieldLeft::from(state.opponent);
-        let player = GameFieldRight::from(state.player);
+impl GameFieldPair {
+ pub fn new(state: TetrisPairState, text_player: Vec<String>, text_opponent: Vec<String> ) -> Self {
+        let player = GameFieldRight::new(state.player, text_player);
+        let opponent = GameFieldLeft::new(state.opponent, text_opponent);
         Self { opponent, player }
-    }
+ }
 }
 
 impl TermRender for GameFieldPair {

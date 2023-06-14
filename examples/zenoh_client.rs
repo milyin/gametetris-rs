@@ -85,8 +85,7 @@ fn main() {
 
         // Draw tetris field on term
         state.swap();
-        state.player.name = "PLAYER".to_string();
-        let field: GameFieldPair = state.into();
+        let field = GameFieldPair::new(state, vec!["PLAYER".to_string()], vec!["OPPONENT".to_string()]);
         let lines = field.render(&AnsiTermStyle);
         term.move_cursor_to(0, 0).unwrap();
         for line in lines {

@@ -14,14 +14,12 @@ use zenoh::{
 };
 
 fn start_tetris_thread(
-    player_name: String,
-    opponent_name: String,
     player_actions: Receiver<Action>,
     opponent_actions: Receiver<Action>,
 ) -> Receiver<TetrisPairState> {
     let (tx, rx) = unbounded();
     thread::spawn(move || {
-        let mut tetris_pair = TetrisPair::new(player_name, opponent_name, 10, 20);
+        let mut tetris_pair = TetrisPair::new(10, 20);
 
         // Setup ganme speed
         let step_delay = time::Duration::from_millis(10);
@@ -119,8 +117,6 @@ fn main() {
 
     let action_rx_player = start_read_key_thread();
     let state_rx = start_tetris_thread(
-        server_name,
-        "OPPONENT".to_string(),
         action_rx_player,
         action_rx_opponent,
     );
@@ -131,7 +127,7 @@ fn main() {
         publisher.put(value).res_sync().unwrap();
 
         // Draw tetris field on term
-        let field: GameFieldPair = state.into();
+        let field = GameFieldPair::new(state, vec!["PLAYER".to_string()], vec!["OPPONENT".to_string()]);
         let lines = field.render(&AnsiTermStyle);
         term.move_cursor_to(0, 0).unwrap();
         for line in lines {
